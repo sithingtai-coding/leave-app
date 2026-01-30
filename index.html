@@ -25,26 +25,6 @@
             </div>
             
             <div class="space-y-4">
-                <!-- 配置区域 (仅兴泰可见或首次配置) -->
-                <div v-if="!config.token" class="p-3 bg-yellow-50 rounded-lg text-xs text-yellow-700 mb-4">
-                    请在下方输入 GitHub Token 以激活全员同步功能
-                </div>
-                <input 
-                    v-if="!config.token"
-                    v-model="configInput.token" 
-                    type="password" 
-                    placeholder="GitHub Token (ghp_...)" 
-                    class="w-full px-4 py-2 text-sm rounded-xl border border-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 mb-2"
-                >
-                <input 
-                    v-if="!config.repo"
-                    v-model="configInput.repo" 
-                    type="text" 
-                    placeholder="仓库名 (用户名/仓库名)" 
-                    class="w-full px-4 py-2 text-sm rounded-xl border border-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                >
-                <hr v-if="!config.token" class="my-4">
-
                 <input 
                     v-model="loginName" 
                     type="text" 
@@ -227,15 +207,11 @@
                 const view = ref('apply');
                 const leaves = ref([]);
                 
-                const config = ref({
-                    token: localStorage.getItem('gh_token') || '',
-                    repo: localStorage.getItem('gh_repo') || ''
-                });
-
-                const configInput = ref({
-                    token: '',
-                    repo: ''
-                });
+                // GitHub 配置直接硬编码，用户无需再输入
+                const config = {
+                    token: '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',
+                    repo: 'sithingtai-coding/leave-app'
+                };
 
                 const form = ref({
                     startDate: '',
@@ -244,18 +220,18 @@
                 });
 
                 const fetchLeaves = async () => {
-                    if (!config.value.token || !config.value.repo) return;
                     try {
-                        const url = `https://api.github.com/repos/${config.value.repo}/contents/data.json`;
+                        const url = `https://api.github.com/repos/${config.repo}/contents/data.json`;
                         const res = await fetch(url, {
-                            headers: { 'Authorization': `token ${config.value.token}` }
+                            headers: { 'Authorization': `token ${config.token}` }
                         });
                         const data = await res.json();
+                        // 解码 Base64 内容
                         const content = decodeURIComponent(escape(atob(data.content)));
                         leaves.value = JSON.parse(content);
-                        localStorage.setItem('gh_sha', data.sha); // 保存文件指纹用于写入
+                        localStorage.setItem('gh_sha', data.sha); 
                     } catch (e) {
-                        console.error('获取 GitHub 数据失败', e);
+                        console.error('获取数据失败', e);
                     }
                 };
 
@@ -281,16 +257,6 @@
                 };
 
                 const executeLogin = (name) => {
-                    // 如果输入了配置，先保存配置
-                    if (configInput.value.token) {
-                        config.value.token = configInput.value.token;
-                        localStorage.setItem('gh_token', config.value.token);
-                    }
-                    if (configInput.value.repo) {
-                        config.value.repo = configInput.value.repo;
-                        localStorage.setItem('gh_repo', config.value.repo);
-                    }
-
                     currentUser.value = name;
                     localStorage.setItem('currentUser', currentUser.value);
                     password.value = '';
@@ -306,11 +272,6 @@
                 };
 
                 const submitLeave = async () => {
-                    if (!config.value.token || !config.value.repo) {
-                        alert('未配置 GitHub 存储环境，无法同步数据');
-                        return;
-                    }
-
                     const newLeave = {
                         user: currentUser.value,
                         ...form.value,
@@ -322,11 +283,11 @@
                         const content = btoa(unescape(encodeURIComponent(JSON.stringify(currentLeaves, null, 2))));
                         const sha = localStorage.getItem('gh_sha');
                         
-                        const url = `https://api.github.com/repos/${config.value.repo}/contents/data.json`;
+                        const url = `https://api.github.com/repos/${config.repo}/contents/data.json`;
                         const response = await fetch(url, {
                             method: 'PUT',
                             headers: { 
-                                'Authorization': `token ${config.value.token}`,
+                                'Authorization': `token ${config.token}`,
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
@@ -336,12 +297,12 @@
                             })
                         });
                         
-                        if (!response.ok) throw new Error('同步至 GitHub 失败');
+                        if (!response.ok) throw new Error('同步数据失败，请检查网络或 Token 权限');
                         
                         await fetchLeaves();
                         form.value = { startDate: '', endDate: '', reason: '' };
                         view.value = 'history';
-                        alert('请假已提交！数据已同步至 GitHub 仓库。');
+                        alert('提交成功！数据已同步。');
                         refreshIcons();
                     } catch (e) {
                         alert('提交失败: ' + e.message);
@@ -363,7 +324,6 @@
 
                 return {
                     currentUser, loginName, password, view, form, leaves, userLeaves,
-                    config, configInput,
                     login, logout, submitLeave
                 };
             }
