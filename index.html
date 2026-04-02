@@ -144,6 +144,7 @@
                 };
 
                 // 翻译状态
+                const userName = ref(localStorage.getItem('userName') || '匿名用户');
                 const sourceLang = ref('zh');
                 const targetLang = ref('en');
                 const sourceText = ref('');
@@ -192,7 +193,7 @@
                                     sourceLang: sourceLang.value,
                                     targetLang: targetLang.value,
                                     prompt: prompt,
-                                    user: currentUser.value
+                                    user: userName.value
                                 }
                             })
                         });
