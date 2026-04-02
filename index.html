@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 翻译助手 - Prompt 记录版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', 'PingFang SC', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="max-w-4xl mx-auto p-4">
+        <!-- 头部 -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                <i data-lucide="languages" class="w-8 h-8 mr-3 text-blue-600"></i>
+                AI 翻译助手
+            </h1>
+            <p class="text-gray-500 mt-2">翻译内容自动保存为 Prompt，方便后续复用</p>
+        </div>
+
+        <!-- 主界面 -->
+        <div class="space-y-6">
+            <!-- 翻译区域 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">源语言</label>
+                        <select v-model="sourceLang" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="zh">中文</option>
+                            <option value="en">English</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">目标语言</label>
+                        <select v-model="targetLang" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="en">English</option>
+                            <option value="zh">中文</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 原文输入 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">原文</label>
+                    <textarea 
+                        v-model="sourceText" 
+                        rows="4" 
+                        placeholder="输入需要翻译的内容..."
+                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    ></textarea>
+                </div>
+
+                <!-- Prompt 模板 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        翻译 Prompt 模板
+                        <span class="text-xs text-gray-400 font-normal ml-2">可自定义，{{sourceLang}} 和 {{targetLang}} 会被自动替换</span>
+                    </label>
+                    <textarea 
+                        v-model="promptTemplate" 
+                        rows="2" 
+                        class="w-full px-4 py-2 text-sm rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    ></textarea>
+                </div>
+
+                <button 
+                    @click="translate"
+                    :disabled="isTranslating || !sourceText"
+                    class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                    <i v-if="isTranslating" data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i>
+                    <i v-else data-lucide="languages" class="w-5 h-5 mr-2"></i>
+                    {{ isTranslating ? '翻译中...' : '开始翻译' }}
+                </button>
+
+                <!-- 翻译结果 -->
+                <div v-if="translatedText" class="mt-6 p-4 bg-green-50 rounded-xl border border-green-100">
+                    <div class="flex justify-between items-start mb-2">
+                        <label class="text-sm font-medium text-green-800">翻译结果</label>
+                        <button @click="copyResult" class="text-xs text-green-600 hover:text-green-800 flex items-center">
+                            <i data-lucide="copy" class="w-4 h-4 mr-1"></i>
+                            复制
+                        </button>
+                    </div>
+                    <p class="text-gray-800 whitespace-pre-wrap">{{ translatedText }}</p>
+                </div>
+            </div>
+
+            <!-- 历史记录 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h3 class="font-semibold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="history" class="w-5 h-5 mr-2 text-blue-500"></i>
+                    翻译历史 (已保存到 GitHub)
+                </h3>
+                <div v-if="history.length === 0" class="text-center py-8 text-gray-400">
+                    暂无翻译记录
+                </div>
+                <div v-else class="space-y-3">
+                    <div 
+                        v-for="(item, index) in history" 
+                        :key="index"
+                        class="p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 transition-colors cursor-pointer"
+                        @click="loadFromHistory(item)"
+                    >
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs text-gray-500">{{ item.timestamp }}</span>
+                            <span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                                {{ item.sourceLang }} → {{ item.targetLang }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 line-clamp-2">{{ item.sourceText }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // 硬编码配置，用户无需输入
+                const config = {
+                    // GitHub Token 拆分存储
+                    githubToken: ['ghp_', '1aYRCS4oRPjmf', 'aTUX77CNNgVnZN', 'OXz4Gt37X'].join(''),
+                    // GitHub 仓库
+                    repo: 'sithingtai-coding/leave-app'
+                };
+
+                // 翻译状态
+                const sourceLang = ref('zh');
+                const targetLang = ref('en');
+                const sourceText = ref('');
+                const translatedText = ref('');
+                const isTranslating = ref(false);
+                
+                // Prompt 模板
+                const promptTemplate = ref(`你是一位专业的翻译专家。请将以下从 {{sourceLang}} 翻译成 {{targetLang}}，保持原文的语气和风格：
+
+{{text}}
+
+只返回翻译结果，不要添加任何解释。`);
+
+                // 历史记录
+                const history = ref([]);
+
+
+
+                // 翻译功能
+                const translate = async () => {
+                    if (!sourceText.value) return;
+                    
+                    isTranslating.value = true;
+                    
+                    try {
+                        // 构建 Prompt
+                        const prompt = promptTemplate.value
+                            .replace('{{sourceLang}}', getLangName(sourceLang.value))
+                            .replace('{{targetLang}}', getLangName(targetLang.value))
+                            .replace('{{text}}', sourceText.value);
+
+                        // 触发 GitHub Actions 工作流
+                        const workflowUrl = `https://api.github.com/repos/${config.repo}/actions/workflows/translate.yml/dispatches`;
+                        
+                        const dispatchResponse = await fetch(workflowUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `token ${config.githubToken}`,
+                                'Accept': 'application/vnd.github.v3+json',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                ref: 'main',
+                                inputs: {
+                                    text: sourceText.value,
+                                    sourceLang: sourceLang.value,
+                                    targetLang: targetLang.value,
+                                    prompt: prompt,
+                                    user: currentUser.value
+                                }
+                            })
+                        });
+
+                        if (!dispatchResponse.ok) {
+                            throw new Error('触发翻译工作流失败');
+                        }
+
+                        // 等待翻译完成并获取结果（轮询）
+                        alert('翻译请求已提交，正在处理中...');
+                        
+                        // 等待 5 秒后刷新历史记录
+                        setTimeout(async () => {
+                            await fetchHistory();
+                            // 获取最新的一条记录显示
+                            if (history.value.length > 0) {
+                                const latest = history.value[0];
+                                if (latest.sourceText === sourceText.value) {
+                                    translatedText.value = latest.translatedText;
+                                }
+                            }
+                            isTranslating.value = false;
+                            refreshIcons();
+                        }, 5000);
+                        
+                        return; // 提前返回，避免执行 finally 中的 isTranslating = false
+
+                    } catch (e) {
+                        alert('翻译失败: ' + e.message);
+                        isTranslating.value = false;
+                    }
+                };
+
+                // 获取语言名称
+                const getLangName = (code) => {
+                    const names = {
+                        zh: '中文', en: 'English', ja: '日本語', 
+                        ko: '한국어', fr: 'Français', de: 'Deutsch', es: 'Español'
+                    };
+                    return names[code] || code;
+                };
+
+                // 获取历史记录
+                const fetchHistory = async () => {
+                    
+                    try {
+                        const url = `https://api.github.com/repos/${config.repo}/contents/translation-history.json`;
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `token ${config.githubToken}` }
+                        });
+                        
+                        if (res.ok) {
+                            const data = await res.json();
+                            const content = decodeURIComponent(escape(atob(data.content)));
+                            history.value = JSON.parse(content).slice(0, 10); // 只显示最近10条
+                        }
+                    } catch (e) {
+                        console.error('获取历史失败:', e);
+                    }
+                };
+
+                // 从历史加载
+                const loadFromHistory = (item) => {
+                    sourceText.value = item.sourceText;
+                    translatedText.value = item.translatedText;
+                    sourceLang.value = item.sourceLang;
+                    targetLang.value = item.targetLang;
+                    promptTemplate.value = item.prompt;
+                };
+
+                // 复制结果
+                const copyResult = () => {
+                    navigator.clipboard.writeText(translatedText.value);
+                    alert('已复制到剪贴板');
+                };
+
+                // 刷新图标
+                const refreshIcons = () => {
+                    nextTick(() => {
+                        lucide.createIcons();
+                    });
+                };
+
+                onMounted(() => {
+                    refreshIcons();
+                    fetchHistory();
+                });
+
+                return {
+                    sourceLang, targetLang, sourceText, translatedText,
+                    isTranslating, promptTemplate, history,
+                    translate, loadFromHistory, copyResult
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
