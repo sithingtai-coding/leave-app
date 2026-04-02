@@ -1,0 +1,87 @@
+name: Translate API
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'Text to translate'
+        required: true
+      sourceLang:
+        description: 'Source language'
+        required: true
+        default: 'zh'
+      targetLang:
+        description: 'Target language'
+        required: true
+        default: 'en'
+      prompt:
+        description: 'Translation prompt'
+        required: true
+      user:
+        description: 'User name'
+        required: true
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Call Bailian API
+        id: translate
+        run: |
+          REQUEST_BODY=$(cat <<EOF
+          {
+            "model": "qwen-turbo",
+            "input": {
+              "messages": [
+                {"role": "system", "content": "You are a professional translator."},
+                {"role": "user", "content": "${{ github.event.inputs.prompt }}"}
+              ]
+            },
+            "parameters": {
+              "temperature": 0.3
+            }
+          }
+          EOF
+          )
+
+          RESPONSE=$(curl -s -X POST https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation \
+            -H "Authorization: Bearer ${{ secrets.BAILIAN_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY")
+
+          TRANSLATED=$(echo "$RESPONSE" | jq -r '.output.text')
+          echo "result=$TRANSLATED" >> $GITHUB_OUTPUT
+
+      - name: Update translation history
+        run: |
+          if [ -f translation-history.json ]; then
+            HISTORY=$(cat translation-history.json)
+          else
+            HISTORY="[]"
+          fi
+
+          NEW_RECORD=$(cat <<EOF
+          {
+            "sourceText": "${{ github.event.inputs.text }}",
+            "translatedText": "${{ steps.translate.outputs.result }}",
+            "sourceLang": "${{ github.event.inputs.sourceLang }}",
+            "targetLang": "${{ github.event.inputs.targetLang }}",
+            "prompt": "${{ github.event.inputs.prompt }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "user": "${{ github.event.inputs.user }}"
+          }
+          EOF
+          )
+
+          echo "$HISTORY" | jq ". + [$NEW_RECORD]" > translation-history.json
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add translation-history.json
+          git diff --staged --quiet || git commit -m "Add translation by ${{ github.event.inputs.user }}"
+          git push
