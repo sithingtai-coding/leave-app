@@ -31,6 +31,7 @@ jobs:
       - name: Call Bailian API
         id: translate
         run: |
+          # 构建请求体
           REQUEST_BODY=$(cat <<EOF
           {
             "model": "qwen-turbo",
@@ -47,22 +48,27 @@ jobs:
           EOF
           )
 
+          # 调用百炼 API
           RESPONSE=$(curl -s -X POST https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation \
             -H "Authorization: Bearer ${{ secrets.BAILIAN_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d "$REQUEST_BODY")
 
+          # 提取翻译结果
           TRANSLATED=$(echo "$RESPONSE" | jq -r '.output.text')
           echo "result=$TRANSLATED" >> $GITHUB_OUTPUT
+          echo "raw_response=$RESPONSE" >> $GITHUB_OUTPUT
 
       - name: Update translation history
         run: |
+          # 读取现有历史
           if [ -f translation-history.json ]; then
             HISTORY=$(cat translation-history.json)
           else
             HISTORY="[]"
           fi
 
+          # 添加新记录
           NEW_RECORD=$(cat <<EOF
           {
             "sourceText": "${{ github.event.inputs.text }}",
@@ -76,6 +82,7 @@ jobs:
           EOF
           )
 
+          # 合并并保存
           echo "$HISTORY" | jq ". + [$NEW_RECORD]" > translation-history.json
 
       - name: Commit changes
