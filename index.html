@@ -229,7 +229,7 @@
                     try {
                         const url = `https://api.github.com/repos/${config.repo}/contents/translate-app/translation-history.json`;
                         const res = await fetch(url, {
-                            headers: { 'Authorization': `token ${config.githubToken}`, 'Cache-Control': 'no-cache' }
+                            headers: { 'Authorization': `token ${config.githubToken}` }
                         });
                         if (res.ok) {
                             const data = await res.json();
