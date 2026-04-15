@@ -25,5 +25,14 @@
     "prompt": "你是一位专业的翻译专家。请将以下内容从 中文 翻译成 English，保持原文的语气和风格，只返回翻译结果，不要添加任何解释。\n\n可以吗",
     "timestamp": "2026-04-02T16:34:55Z",
     "user": "匿名用户"
+  },
+  {
+    "sourceText": "你可以帮我请假吗\n",
+    "translatedText": "null",
+    "sourceLang": "zh",
+    "targetLang": "en",
+    "prompt": "你是一位专业的翻译专家。请将以下内容从 中文 翻译成 English，保持原文的语气和风格，只返回翻译结果，不要添加任何解释。\n\n你可以帮我请假吗\n",
+    "timestamp": "2026-04-15T13:04:24Z",
+    "user": "匿名用户"
   }
 ]
